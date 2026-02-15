@@ -18,12 +18,11 @@ FROM php:8.2-cli
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    libsqlite3-dev \
     libzip-dev \
     zip \
     unzip \
     curl \
-    && docker-php-ext-install pdo pdo_sqlite zip bcmath \
+    && docker-php-ext-install pdo pdo_mysql zip bcmath \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html
@@ -37,25 +36,12 @@ COPY --from=composer /app/vendor ./vendor
 # Copy built frontend assets from build stage
 COPY --from=frontend /app/public/build ./public/build
 
-# Create SQLite database file
-RUN mkdir -p database && touch database/database.sqlite
-
-# Set permissions
+# Set permissions (storage + cache must be writable)
 RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 storage bootstrap/cache database
+    && chmod -R 775 storage bootstrap/cache
 
-# Copy .env.example to .env if not exists
-RUN cp .env.example .env
-
-# Generate app key, cache config, and run migrations
-RUN php artisan key:generate --force \
-    && php artisan config:cache \
-    && php artisan route:cache \
-    && php artisan view:cache \
-    && php artisan migrate --force
-
-# Expose port (Render uses PORT env variable)
+# Expose port (platforms usually provide PORT env variable)
 EXPOSE 10000
 
-# Start the application
+# Start the application (note: set APP_KEY/DB_* via platform env vars)
 CMD php artisan serve --host=0.0.0.0 --port=${PORT:-10000}
